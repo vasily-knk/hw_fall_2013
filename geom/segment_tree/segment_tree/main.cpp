@@ -19,33 +19,50 @@ struct segment_t
 	point_t p1, p2;
 };
 
-struct segment_tree
+inline coord_t value_for_x(const segment_t &segment, coord_t x)
 {
-	typedef uint32_t range_id;
+    const range_t rg = segment.x_range();
+    if (!rg.contains(x))
+        throw std::logic_error("x value outside segment");
 
-	segment_tree(vector<range_t> ranges)
+    if (segment.p1.x == segment.p2.x)
+        return segment.p1.y;
+
+    const double ratio = double(x - segment.p1.x) / double(segment.p2.x - segment.p1.x);
+    const double offset = ratio * double(segment.p2.y - segment.p1.y);
+    return segment.p1.y + coord_t(offset);
+}
+
+struct segment_tree_base
+{
+    typedef vector<segment_t> segments_t;
+    typedef segments_t::const_iterator range_it;
+    typedef vector<range_it> range_its;
+
+    typedef coord_t query_t;
+
+	segment_tree_base(const segments_t &ranges)
 		: root_(build_tree(ranges))
-		, ranges_(ranges)
+		, segments_(ranges)
 	{
-		insert_segments();
+        insert_segments();
 		check(root_);
 	}
 
-	vector<range_t> const &ranges() const
+	range_its query(query_t q) const
 	{
-		return ranges_;
+		range_its dst;
+        query(q, root_, dst);
+        return dst;
 	}
 
-	vector<range_id> query(coord_t q) const
-	{
-		vector<range_id> res;
-		query_impl(q, root_, res);
-		return res;
-	}
+    uint32_t get_id(range_it it) const
+    {
+        return it - segments_.begin();
+    }
 
 private:
-    typedef vector<range_t>::const_iterator range_it;
-	
+
 	struct node_data_t
 	{
 		node_data_t(range_t const &interval)
@@ -53,14 +70,14 @@ private:
 		{}
 
 		range_t interval;
-		vector<range_it> segments;
+		range_its segments;
 	};
 	
 	typedef node_base_t<node_data_t> node_t;
 	typedef node_t::ptr node_ptr;
 
 private:
-	static vector<node_ptr> make_parents(vector<node_ptr> children)
+	static vector<node_ptr> make_parents(const vector<node_ptr> &children)
 	{
 		vector<node_ptr> parents;
 
@@ -91,13 +108,13 @@ private:
 		return parents;
 	}
 
-	static node_ptr build_tree(vector<range_t> const &ranges)
+	static node_ptr build_tree(const segments_t &segments)
 	{
 		std::set<coord_t> endpoints;
-		BOOST_FOREACH(range_t const& range, ranges)
+		BOOST_FOREACH(const auto &segment, segments)
 		{
-			endpoints.insert(range.inf);
-			endpoints.insert(range.sup);
+			endpoints.insert(segment2range(segment).inf);
+			endpoints.insert(segment2range(segment).sup);
 		}
 
 		vector<node_ptr> nodes;
@@ -120,6 +137,11 @@ private:
 		return nodes.front();
 	}
 
+    static range_t segment2range(const segment_t &segment) 
+    {
+        return segment.x_range();
+    }
+
 private:
 	void insert_segment(range_it it, node_ptr node)
 	{
@@ -127,15 +149,16 @@ private:
 		assert(node->l() || !node->r());
 
 		range_t interval = node->value().interval;
+        range_t it_range = segment2range(*it);
 
-		if ((*it & interval).is_empty())
+		if ((it_range & interval).is_empty())
 		{
 			// root has to intersect EVERY inserted segment
 			assert(node != root_);
 			return;
 		}
 
-		if (interval.inf >= it->inf && interval.sup <= it->sup)
+		if (interval.inf >= it_range.inf && interval.sup <= it_range.sup)
 		{
 			// store the segment here
 			node->value().segments.push_back(it);
@@ -151,23 +174,50 @@ private:
 
 	void insert_segments()
 	{
-        for (range_it it = ranges_.begin(); it != ranges_.end(); ++it)
+        for (range_it it = segments_.begin(); it != segments_.end(); ++it)
 			insert_segment(it, root_);
+
+        sort_segments(root_);
 	}
 
-	void query_impl(coord_t q, node_ptr node, vector<range_id> &out_ids) const
+    void sort_segments(node_ptr node)
+    {
+        auto comp = [this, node](range_it it1, range_it it2) -> bool
+        {
+            const coord_t x = node->value().interval.inf;
+            const coord_t y1 = value_for_x(*it1, x);
+            const coord_t y2 = value_for_x(*it2, x);
+
+            return y1 < y2;
+        };
+        
+        // maintaining segments order
+        boost::sort(node->value().segments, comp);
+        
+        if (node->l())
+            sort_segments(node->l());
+        if (node->r())
+            sort_segments(node->r());
+    }
+
+    void query(query_t q, node_ptr node, range_its &dst) const
 	{
 		const range_t interval = node->value().interval;
 		if (q < interval.inf || q > interval.sup)
 			return;
 
-        BOOST_FOREACH(range_it it, node->value().segments)
-            out_ids.push_back(it - ranges_.begin());
+        // extraction
+        auto comp = [this](range_it it, const point_t &point)
+        {
+            return value_for_x(*it, point.x) < point.y;
+        };
+
+        boost::copy(node->value().segments, std::back_inserter(dst));
 
 		if (node->l() && node->l()->value().interval.contains(q))
-			query_impl(q, node->l(), out_ids);
+			query(q, node->l(), dst);
 		else if (node->r())
-			query_impl(q, node->r(), out_ids);
+			query(q, node->r(), dst);
 	}
 
 	static void check(node_ptr node)
@@ -197,17 +247,10 @@ private:
 
 private:
 	node_ptr root_;
-	vector<range_t> ranges_;
+	segments_t segments_;
 };
-
-
 
 int main()
 {
-	vector<range_t> segments;
-
-	segment_tree st(segments);
-	auto res = st.query(60);
-
 	return 0;
 }
