@@ -1,44 +1,59 @@
 #include "primitives.h"
 #include "tree.h"
 
-typedef range_t segment_t;
+struct segment_t
+{
+	segment_t(point_t const &p1, point_t const &p2)
+		: p1(p1)
+		, p2(p2)
+	{}
+	
+	range_t x_range() const { return range_t(std::min(p1.x, p2.x), std::max(p1.x, p2.x)); }
+	range_t y_range() const { return range_t(std::min(p1.y, p2.y), std::max(p1.y, p2.y)); }
+
+    bool lower(const segment_t &other) const
+    {
+        return true; // fixme
+    }
+
+	point_t p1, p2;
+};
 
 struct segment_tree
 {
-	typedef uint32_t segment_id;
+	typedef uint32_t range_id;
 
-	segment_tree(vector<segment_t> segments)
-		: root_(build_tree(segments))
-		, segments_(segments)
+	segment_tree(vector<range_t> ranges)
+		: root_(build_tree(ranges))
+		, ranges_(ranges)
 	{
 		insert_segments();
 		check(root_);
 	}
 
-	vector<segment_t> const &segments() const
+	vector<range_t> const &ranges() const
 	{
-		return segments_;
+		return ranges_;
 	}
 
-	vector<segment_id> query(coord_t q) const
+	vector<range_id> query(coord_t q) const
 	{
-		vector<segment_id> res;
+		vector<range_id> res;
 		query_impl(q, root_, res);
 		return res;
 	}
 
 private:
+    typedef vector<range_t>::const_iterator range_it;
 	
 	struct node_data_t
 	{
 		node_data_t(range_t const &interval)
 			: interval(interval)
-		{
-
-		}
+		{}
 
 		range_t interval;
-		vector<segment_id> segments;
+		vector<range_it> segments;
 	};
 	
 	typedef node_base_t<node_data_t> node_t;
@@ -106,48 +121,48 @@ private:
 	}
 
 private:
-	void insert_segment(segment_id id, node_ptr node)
+	void insert_segment(range_it it, node_ptr node)
 	{
 		// can't have only right child
 		assert(node->l() || !node->r());
 
-		segment_t segment = segments_.at(id);
 		range_t interval = node->value().interval;
 
-		if ((segment & interval).is_empty())
+		if ((*it & interval).is_empty())
 		{
 			// root has to intersect EVERY inserted segment
 			assert(node != root_);
 			return;
 		}
 
-		if (interval.inf >= segment.inf && interval.sup <= segment.sup)
+		if (interval.inf >= it->inf && interval.sup <= it->sup)
 		{
 			// store the segment here
-			node->value().segments.push_back(id);
+			node->value().segments.push_back(it);
 		}
 		else
 		{
 			if (node->l())
-				insert_segment(id, node->l());
+				insert_segment(it, node->l());
 			if (node->r())
-				insert_segment(id, node->r());
+				insert_segment(it, node->r());
 		}
 	}
 
 	void insert_segments()
 	{
-		for (uint32_t i = 0; i < segments_.size(); ++i)
-			insert_segment(i, root_);
+        for (range_it it = ranges_.begin(); it != ranges_.end(); ++it)
+			insert_segment(it, root_);
 	}
 
-	void query_impl(coord_t q, node_ptr node, vector<segment_id> &out_ids) const
+	void query_impl(coord_t q, node_ptr node, vector<range_id> &out_ids) const
 	{
 		const range_t interval = node->value().interval;
 		if (q < interval.inf || q > interval.sup)
 			return;
 
-		boost::copy(node->value().segments, std::back_inserter(out_ids));
+        BOOST_FOREACH(range_it it, node->value().segments)
+            out_ids.push_back(it - ranges_.begin());
 
 		if (node->l() && node->l()->value().interval.contains(q))
 			query_impl(q, node->l(), out_ids);
@@ -155,7 +170,7 @@ private:
 			query_impl(q, node->r(), out_ids);
 	}
 
-	void check(node_ptr node)
+	static void check(node_ptr node)
 	{
 		// can't have only right child
 		assert(node->l() || !node->r());
@@ -182,19 +197,14 @@ private:
 
 private:
 	node_ptr root_;
-	vector<segment_t> segments_;
+	vector<range_t> ranges_;
 };
 
 
 
 int main()
 {
-	vector<segment_t> segments;
-	segments.push_back(segment_t(0, 20));
-	segments.push_back(segment_t(10, 30));
-	segments.push_back(segment_t(20, 30));
-	segments.push_back(segment_t(5, 45));
-	segments.push_back(segment_t(50, 60));
+	vector<range_t> segments;
 
 	segment_tree st(segments);
 	auto res = st.query(60);
