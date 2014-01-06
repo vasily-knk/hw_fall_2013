@@ -7,7 +7,11 @@ object MyLang {
         def real: Double = throw new WrongType("real")
         def literal: String = throw new WrongType("literal")
         def bool: Boolean = throw new WrongType("boolean")
+
+        def field(name : String) : Value = throw new WrongField(name)
+
         case class WrongType(smth:String) extends Exception
+        case class WrongField(smth:String) extends Exception
     }
 
     type Args = List[String]
@@ -20,13 +24,13 @@ object MyLang {
         override def bool = integer != 0
     }
 
-    case class RealValue(override val real: Double) extends Value {
+    case class DoubleValue(override val real: Double) extends Value {
         override def bool = real != 0
     }
     case class LitValue(override val literal: String) extends Value
 
     type Vars = Map[String, Value]
-    type Funcs = Map[String, Func]
+    type Funcs = Map[String, FuncBase]
 
     case class Context(vars: Vars, funcs: Funcs)
 
@@ -43,12 +47,27 @@ object MyLang {
                     op match {
                         case "+" => LitValue(s1 + s2)
                     }
-                case (RealValue(leftVal), RealValue(rightVal)) =>
+                case (DoubleValue(leftVal), DoubleValue(rightVal)) =>
                     op match {
-                        case "+" => RealValue(leftVal + rightVal)
-                        case "-" => RealValue(leftVal - rightVal)
-                        case "*" => RealValue(leftVal * rightVal)
-                        case "/" => RealValue(leftVal / rightVal)
+                        case "+" => DoubleValue(leftVal + rightVal)
+                        case "-" => DoubleValue(leftVal - rightVal)
+                        case "*" => DoubleValue(leftVal * rightVal)
+                        case "/" => DoubleValue(leftVal / rightVal)
+
+                        case "<" => new IntValue(leftVal < rightVal)
+                        case ">" => new IntValue(leftVal > rightVal)
+                        case "<=" => new IntValue(leftVal <= rightVal)
+                        case ">=" => new IntValue(leftVal >= rightVal)
+
+                        case "==" => new IntValue(leftVal == rightVal)
+                        case "!=" => new IntValue(leftVal != rightVal)
+                    }
+                case (IntValue(leftVal), IntValue(rightVal)) =>
+                    op match {
+                        case "+" => IntValue(leftVal + rightVal)
+                        case "-" => IntValue(leftVal - rightVal)
+                        case "*" => IntValue(leftVal * rightVal)
+                        case "/" => IntValue(leftVal / rightVal)
 
                         case "<" => new IntValue(leftVal < rightVal)
                         case ">" => new IntValue(leftVal > rightVal)
@@ -62,16 +81,16 @@ object MyLang {
         }
     }
 
-    case class NumericExpression(number: Double) extends Expr {
-        def eval(context: Context): Value = RealValue(number)
+    case class NumericExpr(number: Double) extends Expr {
+        override def eval(context: Context): Value = DoubleValue(number)
     }
 
     case class LiteralExpression(string: String) extends Expr {
-        def eval(context: Context): Value = LitValue(string.substring(1, string.length - 1))
+        override def eval(context: Context): Value = LitValue(string.substring(1, string.length - 1))
     }
 
     case class ParenthesisedExpression(expr: Expr) extends Expr {
-        def eval(context: Context): Value = expr.eval(context)
+        override  def eval(context: Context): Value = expr.eval(context)
     }
 
     case class VariableExpression(name: String) extends Expr {
@@ -96,17 +115,43 @@ object MyLang {
         }
     }
 
-    case class Func(name: String, args: Args, body: Body) {
-        case class WrongArgsNum(smth:String) extends Exception
+    trait FuncBase {
+        class WrongArgsNum extends Exception {
+            override val toString = "Wrong number of args"
+        }
 
-        def call(argValues: ArgValues, funcs: Funcs) : Value = {
+        def name : String
+        def call(argValues: ArgValues, funcs: Funcs) : Value
+    }
+
+    case class StructValue(vars : Vars) extends Value {
+        override def field(name : String) : Value =  vars.get(name) match {
+            case Some(value) => value
+            case None => throw new WrongField(name)
+        }
+    }
+
+    case class StructFunc(name: String, args: Args) extends FuncBase {
+        override def call(argValues: ArgValues, funcs: Funcs) : Value = {
             if (argValues.length != args.length)
-                throw WrongArgsNum("Wrong number of args")
+                throw new WrongArgsNum
 
             var vars = new HashMap[String, Value]
-            (args zip argValues).map({
-                case (argName, argValue) => vars += (argName -> argValue)
-            })
+            for ((argName, argValue) <- args zip argValues)
+                vars += (argName -> argValue)
+
+            StructValue(vars)
+        }
+    }
+
+    case class UserFunc(name: String, args: Args, body: Body) extends FuncBase {
+        override def call(argValues: ArgValues, funcs: Funcs) : Value = {
+            if (argValues.length != args.length)
+                throw new WrongArgsNum
+
+            var vars = new HashMap[String, Value]
+            for ((argName, argValue) <- args zip argValues)
+                vars += (argName -> argValue)
 
             body.eval(Context(vars, funcs))
         }
@@ -127,18 +172,11 @@ object MyLang {
                 thenBlock.eval(context)
             else
                 elseBlock.eval(context)
-
-
-        /*elseBlock match
-        {
-            case Some(body) => body.eval(context)
-            case None => thenBlock.eval(context)
-        }*/
     }
 
     object Prog {
-        def list2map(list: List[Func]): Funcs = {
-            var funcs = new HashMap[String, Func]()
+        def list2map(list: List[FuncBase]): Funcs = {
+            var funcs = new HashMap[String, FuncBase]
             list.map({
                 case f => funcs += (f.name -> f)
             })
@@ -146,9 +184,29 @@ object MyLang {
         }
     }
 
-    class Prog(private val funcs: Funcs) {
-        def this(list: List[Func]) = {
+    class Prog(userFuncs: Funcs) {
+        private val funcs = userFuncs + ("double2int" -> Double2Int) + ("int2double" -> Int2Double)
+
+        def this(list: List[FuncBase]) = {
             this(Prog.list2map(list))
+        }
+
+        object Double2Int extends FuncBase {
+            override val name = "Double2Int"
+            def call(argValues: ArgValues, funcs: Funcs) : Value =
+                if (argValues.size != 1)
+                    throw new WrongArgsNum
+                else
+                    IntValue(argValues(0).real.toInt)
+        }
+
+        object Int2Double extends FuncBase {
+            override val name = "Int2Double"
+            def call(argValues: ArgValues, funcs: Funcs) : Value =
+                if (argValues.size != 1)
+                    throw new WrongArgsNum
+                else
+                    DoubleValue(argValues(0).integer.toDouble)
         }
 
         def run: Value = {
@@ -177,7 +235,7 @@ class MyLang extends JavaTokenParsers {
     def call: Parser[Expr] = ident ~ callArgs ^^ {case name ~ args => CallExpr(name, args)}
 
     def factor: Parser[Expr] =
-        floatingPointNumber ^^ { case s => NumericExpression(s.toDouble) } |
+        floatingPointNumber ^^ { case s => NumericExpr(s.toDouble) } |
         stringLiteral       ^^ LiteralExpression  |
         cond |
         call |
@@ -187,7 +245,8 @@ class MyLang extends JavaTokenParsers {
 
     def assign: Parser[Assignment] = (ident <~ "=") ~ expr ^^ { case name ~ e => Assignment(name, e) }
 
-    def body: Parser[Body] = ("{" ~> rep(assign <~ ";")) ~ expr <~ "}" ^^ { case list ~ e => Body(list, e) }
+    def body: Parser[Body] = (("{" ~> rep(assign <~ ";")) ~ expr <~ "}" ^^ { case list ~ e => Body(list, e) }) |
+        expr ^^ { case e => Body(List(), e)}
 
     def then_block: Parser[Body] = "then" ~> body
     def else_block: Parser[Body] = "else" ~> body
@@ -196,19 +255,29 @@ class MyLang extends JavaTokenParsers {
 
     def args: Parser[Args] = "(" ~> repsep(ident, ",") <~ ")"
 
-    def func: Parser[Func] = ("def" ~> ident) ~ args ~ body ^^ {case name ~ args ~ body => Func(name, args, body) }
+    def func: Parser[FuncBase] = ("def" ~> ident) ~ args ~ body ^^ {case name ~ args ~ body => UserFunc(name, args, body) }
 
-    def prog: Parser[Prog] = rep(func) ^^ { case list => new Prog(list) }
+    def structFields: Parser[Args] = "{" ~> repsep(ident, ",") <~ "}"
+
+    def struct: Parser[FuncBase] = ("struct" ~> ident) ~ structFields ^^ {case name ~ args => StructFunc(name, args) }
+
+    def prog: Parser[Prog] = rep(func | struct) ^^ { case list => new Prog(list) }
 }
 
 object Hello extends MyLang {
-//    def sum(a:Int, b:Int) = a + b
-
     def main(args: Array[String]) {
 
+
+
         val text = """
+                     | struct Foo { fuck, you }
+                     |
                      | def sum(a, b) { c = a + b; c }
-                     | def main() { string = "Hello"; string = sum(string, " world"); if (1 > 0) then { string } else { string + " and you!"} }
+                     | def main() {
+                     |   string = "Hello";
+                     |   string = sum(string, " world");
+                     |   if (1 < 0) then string else Foo(10, "Hi!")
+                     | }
                    """.stripMargin
 
         val res = parseAll(prog, text)
