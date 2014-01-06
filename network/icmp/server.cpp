@@ -39,7 +39,7 @@ void send_reply(icmp::socket &socket, const icmp::endpoint &ep, const icmp_heade
     socket.send_to(buffer.data(), ep);
 }
 
-int server_main()
+int main()
 {
     const size_t default_size = 65536;
     

@@ -4,10 +4,11 @@ CFLAGS=-std=c++0x -lboost_filesystem -lpthread -lboost_thread -lboost_system
 
 
 client: client.cpp
-	g++ $(CFLAGS) client.cpp -o client
+	g++ client.cpp $(CFLAGS) -o client
 
 server: server.cpp
-	g++ $(CFLAGS) server.cpp -o server
+	g++ server.cpp $(CFLAGS) -o server
 
 clean:
 	rm -rf client server
+	
