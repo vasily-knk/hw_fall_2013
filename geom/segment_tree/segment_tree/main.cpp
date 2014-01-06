@@ -212,6 +212,7 @@ private:
             return value_for_x(*it, point.x) < point.y;
         };
 
+       
         boost::copy(node->value().segments, std::back_inserter(dst));
 
 		if (node->l() && node->l()->value().interval.contains(q))
