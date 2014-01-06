@@ -6,6 +6,7 @@ object MyLang {
         def integer: Int = throw new WrongType("integer")
         def real: Double = throw new WrongType("real")
         def literal: String = throw new WrongType("literal")
+        def bool: Boolean = throw new WrongType("boolean")
         case class WrongType(smth:String) extends Exception
     }
 
@@ -13,7 +14,15 @@ object MyLang {
     type CallArgs = List[Expr]
     type ArgValues = List[Value]
 
-    case class RealValue(override val real: Double) extends Value
+    case class IntValue(override val integer: Int) extends Value {
+        def this(b : Boolean) = this(if (b) 1 else 0)
+
+        override def bool = integer != 0
+    }
+
+    case class RealValue(override val real: Double) extends Value {
+        override def bool = real != 0
+    }
     case class LitValue(override val literal: String) extends Value
 
     type Vars = Map[String, Value]
@@ -40,6 +49,14 @@ object MyLang {
                         case "-" => RealValue(leftVal - rightVal)
                         case "*" => RealValue(leftVal * rightVal)
                         case "/" => RealValue(leftVal / rightVal)
+
+                        case "<" => new IntValue(leftVal < rightVal)
+                        case ">" => new IntValue(leftVal > rightVal)
+                        case "<=" => new IntValue(leftVal <= rightVal)
+                        case ">=" => new IntValue(leftVal >= rightVal)
+
+                        case "==" => new IntValue(leftVal == rightVal)
+                        case "!=" => new IntValue(leftVal != rightVal)
                     }
             }
         }
@@ -104,8 +121,19 @@ object MyLang {
         }
     }
 
-    case class CondExpr(condition: Expr, body: Body) extends Expr {
-        override def eval(context: Context): Value = body.eval(context)
+    case class CondExpr(condition: Expr, thenBlock: Body, elseBlock: Body) extends Expr {
+        override def eval(context: Context): Value =
+            if (condition.eval(context).bool)
+                thenBlock.eval(context)
+            else
+                elseBlock.eval(context)
+
+
+        /*elseBlock match
+        {
+            case Some(body) => body.eval(context)
+            case None => thenBlock.eval(context)
+        }*/
     }
 
     object Prog {
@@ -139,8 +167,10 @@ class MyLang extends JavaTokenParsers {
             }
     }
 
-    def expr: Parser[Expr] = term ~ rep("+" ~ term | "-" ~ term) ^^ convertToBinary
-    def term: Parser[Expr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ convertToBinary
+    def expr: Parser[Expr] = ordering ~ rep("==" ~ ordering | "!=" ~ ordering) ^^ convertToBinary
+    def ordering: Parser[Expr] = additive ~ rep("<" ~ additive | ">" ~ additive | "<=" ~ additive | ">=" ~ additive) ^^ convertToBinary
+    def additive: Parser[Expr] = multiplicative ~ rep("+" ~ multiplicative | "-" ~ multiplicative) ^^ convertToBinary
+    def multiplicative: Parser[Expr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ convertToBinary
 
     def callArgs: Parser[CallArgs] = "(" ~> repsep(expr, ",") <~ ")"
 
@@ -159,7 +189,10 @@ class MyLang extends JavaTokenParsers {
 
     def body: Parser[Body] = ("{" ~> rep(assign <~ ";")) ~ expr <~ "}" ^^ { case list ~ e => Body(list, e) }
 
-    def cond: Parser[CondExpr] = (("if" ~> expr) <~ "then") ~ body ^^ { case cond ~ body => CondExpr(cond, body) }
+    def then_block: Parser[Body] = "then" ~> body
+    def else_block: Parser[Body] = "else" ~> body
+
+    def cond: Parser[CondExpr] = ("if" ~> expr) ~ then_block ~ else_block ^^ { case cond ~ thenBlock ~ elseBlock => CondExpr(cond, thenBlock, elseBlock) }
 
     def args: Parser[Args] = "(" ~> repsep(ident, ",") <~ ")"
 
@@ -175,12 +208,15 @@ object Hello extends MyLang {
 
         val text = """
                      | def sum(a, b) { c = a + b; c }
-                     | def main() { string = "Hello"; string = sum(string, " world"); if (1) then { string } }
+                     | def main() { string = "Hello"; string = sum(string, " world"); if (1 > 0) then { string } else { string + " and you!"} }
                    """.stripMargin
 
         val res = parseAll(prog, text)
 
-        println(res.get.run)
+        if(res.successful)
+            println(res.get.run)
+        else
+            println(res)
 
     }
 }
