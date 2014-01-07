@@ -10,15 +10,18 @@ trait Graph {
     def connect(a: Node, b: Node) : Edge
 }
 
-abstract class ListGraph extends Graph {
+trait GraphImpl extends Graph {
+    protected def connectImpl(a: Node, b: Node): Edge
+}
+
+trait ListGraph extends GraphImpl {
     private var nodes: List[Node] = Nil
     private var edges: List[Edge] = Nil
 
-    case class EdgeImpl(a: Node, b: Node)
-    override type Edge = EdgeImpl
+    override type Edge = Tuple2[Node, Node]
 
-    override def connect(a: Node, b: Node): Edge = {
-        val e = EdgeImpl(a, b)
+    protected override def connectImpl(a: Node, b: Node): Edge = {
+        val e = (a, b)
         edges ::= e
         e
     }
@@ -28,13 +31,18 @@ abstract class ListGraph extends Graph {
     }
 }
 
-class SimpleGraph extends ListGraph {
+trait SimpleGraph extends Graph {
+    self: GraphImpl =>
+
     class NodeImpl
     override type Node = NodeImpl
     def makeNode: Node = new NodeImpl
+    override def connect(a: Node, b: Node) : Edge = connectImpl(a, b)
 }
 
-class ColoredGraph extends ListGraph {
+trait ColoredGraph extends Graph {
+    self: GraphImpl =>
+
     case class SameColor(color: Int) extends Exception
 
     case class NodeImpl(color: Int)
@@ -44,7 +52,7 @@ class ColoredGraph extends ListGraph {
     override def connect(a: Node, b: Node): Edge = {
         if (a.color == b.color)
             throw SameColor(a.color)
-        super.connect(a, b)
+        connectImpl(a, b)
     }
 }
 
@@ -52,10 +60,11 @@ class ColoredGraph extends ListGraph {
 
 object Main extends App {
     def main() {
-        val cg = new ColoredGraph
+        val cg = new ColoredGraph with ListGraph
         val n1 = cg.makeNode(1)
         val n2 = cg.makeNode(1)
         val e = cg.connect(n1, n2)
+        println(e._1.color)
     }
 
     main()
