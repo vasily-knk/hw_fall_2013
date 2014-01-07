@@ -2,13 +2,15 @@ import scala.util.parsing.combinator._
 import scala.collection.immutable._
 
 object MyLang {
-    trait Value {
+    trait Value extends Expr {
         def integer: Int = throw new WrongType("integer")
         def real: Double = throw new WrongType("real")
         def literal: String = throw new WrongType("literal")
         def bool: Boolean = throw new WrongType("boolean")
 
         def field(name : String) : Value = throw new WrongField(name)
+
+        override def eval(context: Context) = this
 
         case class WrongType(smth:String) extends Exception
         case class WrongField(smth:String) extends Exception
@@ -35,7 +37,11 @@ object MyLang {
     case class Context(vars: Vars, funcs: Funcs)
 
     trait Expr {
+        class RValueAssignment extends Exception {
+            override val toString = "Can't assign an RValue"
+        }
         def eval(context: Context) : Value
+        def assign(context: Context, value: Expr) : Context = throw new RValueAssignment
     }
 
     case class FieldExpr(left : Expr, field : String) extends Expr {
@@ -82,6 +88,9 @@ object MyLang {
 
                         case "==" => new IntValue(leftVal == rightVal)
                         case "!=" => new IntValue(leftVal != rightVal)
+
+                        case "&&" => new IntValue(leftVal != 0 && rightVal != 0)
+                        case "||" => new IntValue(leftVal != 0 || rightVal != 0)
                     }
             }
         }
@@ -198,7 +207,7 @@ object MyLang {
         }
 
         object Double2Int extends FuncBase {
-            override val name = "Double2Int"
+            override val name = "double2int"
             def call(argValues: ArgValues, funcs: Funcs) : Value =
                 if (argValues.size != 1)
                     throw new WrongArgsNum
@@ -207,7 +216,7 @@ object MyLang {
         }
 
         object Int2Double extends FuncBase {
-            override val name = "Int2Double"
+            override val name = "int2double"
             def call(argValues: ArgValues, funcs: Funcs) : Value =
                 if (argValues.size != 1)
                     throw new WrongArgsNum
@@ -231,7 +240,11 @@ class MyLang extends JavaTokenParsers {
             }
     }
 
-    def expr: Parser[Expr] = ordering ~ rep("==" ~ ordering | "!=" ~ ordering) ^^ convertToBinary
+    def assign: Parser[Assignment] = (ident <~ "=") ~ expr ^^ { case name ~ e => Assignment(name, e) }
+    def expr = logicalOr
+    def logicalOr: Parser[Expr] = logicalAnd ~ rep("||" ~ logicalAnd) ^^ convertToBinary
+    def logicalAnd: Parser[Expr] = comparison ~ rep("&&" ~ comparison) ^^ convertToBinary
+    def comparison: Parser[Expr] = ordering ~ rep("==" ~ ordering | "!=" ~ ordering) ^^ convertToBinary
     def ordering: Parser[Expr] = additive ~ rep("<" ~ additive | ">" ~ additive | "<=" ~ additive | ">=" ~ additive) ^^ convertToBinary
     def additive: Parser[Expr] = multiplicative ~ rep("+" ~ multiplicative | "-" ~ multiplicative) ^^ convertToBinary
     def multiplicative: Parser[Expr] = reference ~ rep("*" ~ reference | "/" ~ reference) ^^ convertToBinary
@@ -245,16 +258,21 @@ class MyLang extends JavaTokenParsers {
 
     def call: Parser[Expr] = ident ~ callArgs ^^ {case name ~ args => CallExpr(name, args)}
 
+    def number: Parser[Expr] = floatingPointNumber ^^ { case s =>
+        if ("""-?\d+""".r.pattern.matcher(s).matches())
+            IntValue(s.toInt)
+        else
+            DoubleValue(s.toDouble)
+    }
+
     def factor: Parser[Expr] =
-        floatingPointNumber ^^ { case s => NumericExpr(s.toDouble) } |
+        number |
         stringLiteral       ^^ LiteralExpression  |
         cond |
         call |
         ident               ^^ VariableExpression |
         ("(" ~> expr <~ ")")
 
-
-    def assign: Parser[Assignment] = (ident <~ "=") ~ expr ^^ { case name ~ e => Assignment(name, e) }
 
     def body: Parser[Body] = (("{" ~> rep(assign <~ ";")) ~ expr <~ "}" ^^ { case list ~ e => Body(list, e) }) |
         expr ^^ { case e => Body(List(), e)}
@@ -281,15 +299,18 @@ object Hello extends MyLang {
 
 
         val text = """
-                     | struct Foo { fuck, you }
-                     | struct Bar { you, too }
+                     | struct Foo { whats, up }
+                     | struct Bar { im, good }
                      |
                      | def sum(a, b) { c = a + b; c }
+                     |
+                     |
+                     |
                      | def main() {
                      |   string = "Hello";
                      |   string = sum(string, " world");
-                     |   bar = Bar(Foo(10, "Hi!"), ":)");
-                     |   if (1 < 0) then string else bar.you.you
+                     |   foo = Foo(int2double(3), string);
+                     |   if (1 < 0 && 1) then string else Bar(foo, ":)").im.whats
                      | }
                    """.stripMargin
 
