@@ -38,6 +38,12 @@ object MyLang {
         def eval(context: Context) : Value
     }
 
+    case class FieldExpr(left : Expr, field : String) extends Expr {
+        def eval(context: Context): Value = {
+            left.eval(context).field(field)
+        }
+    }
+
     case class BinaryExpression(left: Expr, op: String, right: Expr) extends Expr {
         def eval(context: Context) : Value = {
             val values = (left.eval(context), right.eval(context))
@@ -228,7 +234,12 @@ class MyLang extends JavaTokenParsers {
     def expr: Parser[Expr] = ordering ~ rep("==" ~ ordering | "!=" ~ ordering) ^^ convertToBinary
     def ordering: Parser[Expr] = additive ~ rep("<" ~ additive | ">" ~ additive | "<=" ~ additive | ">=" ~ additive) ^^ convertToBinary
     def additive: Parser[Expr] = multiplicative ~ rep("+" ~ multiplicative | "-" ~ multiplicative) ^^ convertToBinary
-    def multiplicative: Parser[Expr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ convertToBinary
+    def multiplicative: Parser[Expr] = reference ~ rep("*" ~ reference | "/" ~ reference) ^^ convertToBinary
+    def reference: Parser[Expr] = factor ~ rep("." ~> ident) ^^ { case e ~ fields =>
+        fields.foldLeft(e) {
+            case (res, field) => FieldExpr(res, field)
+        }
+    }
 
     def callArgs: Parser[CallArgs] = "(" ~> repsep(expr, ",") <~ ")"
 
@@ -271,12 +282,14 @@ object Hello extends MyLang {
 
         val text = """
                      | struct Foo { fuck, you }
+                     | struct Bar { you, too }
                      |
                      | def sum(a, b) { c = a + b; c }
                      | def main() {
                      |   string = "Hello";
                      |   string = sum(string, " world");
-                     |   if (1 < 0) then string else Foo(10, "Hi!")
+                     |   bar = Bar(Foo(10, "Hi!"), ":)");
+                     |   if (1 < 0) then string else bar.you.you
                      | }
                    """.stripMargin
 
