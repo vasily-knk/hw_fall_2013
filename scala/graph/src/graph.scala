@@ -1,6 +1,4 @@
-/**
- * Created by vasya on 07.01.14.
- */
+import scala.collection.immutable.HashMap
 
 
 trait Graph {
@@ -12,22 +10,29 @@ trait Graph {
 
 trait GraphImpl extends Graph {
     protected def connectImpl(a: Node, b: Node): Edge
+    protected def addNode(n: Node) : Node
 }
 
 trait ListGraph extends GraphImpl {
-    private var nodes: List[Node] = Nil
-    private var edges: List[Edge] = Nil
+    private var nodes: HashMap[Node, List[Node]] = HashMap[Node, List[Node]]()
 
     override type Edge = Tuple2[Node, Node]
 
     protected override def connectImpl(a: Node, b: Node): Edge = {
-        val e = (a, b)
-        edges ::= e
-        e
+        nodes += a -> (nodes.get(a).get :+ b)
+        (a, b)
     }
 
-    protected def addNode(n: Node) = {
-        nodes ::= n
+    protected def addNode(n: Node) : Node = {
+        nodes += (n -> Nil)
+        n
+    }
+}
+
+trait BiDirListGraph extends ListGraph {
+    protected override def connectImpl(a: Node, b: Node): Edge = {
+        super.connectImpl(a, b)
+        super.connectImpl(b, a)
     }
 }
 
@@ -36,7 +41,7 @@ trait SimpleGraph extends Graph {
 
     class NodeImpl
     override type Node = NodeImpl
-    def makeNode: Node = new NodeImpl
+    def makeNode: Node = addNode(new NodeImpl)
     override def connect(a: Node, b: Node) : Edge = connectImpl(a, b)
 }
 
@@ -47,7 +52,7 @@ trait ColoredGraph extends Graph {
 
     case class NodeImpl(color: Int)
     override type Node = NodeImpl
-    def makeNode(color: Int): Node = NodeImpl(color)
+    def makeNode(color: Int): Node = addNode(NodeImpl(color))
 
     override def connect(a: Node, b: Node): Edge = {
         if (a.color == b.color)
@@ -62,7 +67,7 @@ object Main extends App {
     def main() {
         val cg = new ColoredGraph with ListGraph
         val n1 = cg.makeNode(1)
-        val n2 = cg.makeNode(1)
+        val n2 = cg.makeNode(2)
         val e = cg.connect(n1, n2)
         println(e._1.color)
     }
