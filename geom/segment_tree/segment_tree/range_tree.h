@@ -6,28 +6,23 @@
 struct range_tree_t
 {
     typedef vector<point_t> points_t;
-    typedef size_t index_t;
-    typedef vector<index_t> indices_t;
-
+    
     range_tree_t(const points_t &points)
         : points_(points)
-        , x_sorted_(prepare_sorted(true ))
-        , y_sorted_(prepare_sorted(false))
+        , subset_(prepare_subset())
         , root_(build_tree())
     {
         MY_ASSERT(ok());
     }
 
-    indices_t query(range_t range) const
+    vector<size_t> query(range_t range) const
     {
         if (!root_)
-            return indices_t();
+            return vector<size_t>();
         
         deque<node_t::ptr> nodes;
 
         node_t::ptr node = find_split_node(range);
-        const size_t d1 = node->value().i_begin - x_sorted_.begin();
-        const size_t d2 = node->value().i_end   - x_sorted_.begin();
         if (node->is_leaf())
         {
             const assoc_struct_t &as = node->value();
@@ -49,6 +44,18 @@ struct range_tree_t
     }
 
 private:
+    struct index_t
+    {
+        explicit index_t(size_t i)
+            : i(i) 
+        {}
+        size_t i;
+    };
+    typedef vector<index_t> indices_t;
+    struct subset_t
+    {
+        indices_t x, y;
+    };
     typedef indices_t::const_iterator it_t;
     
     struct assoc_struct_t 
@@ -73,27 +80,55 @@ private:
 
         bool operator()(index_t i1, index_t i2) const
         {
-            const point_t &p1 = points_->at(i1);
-            const point_t &p2 = points_->at(i2);
-            return x_coord_ ? p1.x < p2.x : p1.y < p2.y;
-        }
-
-        bool operator()(index_t i1, coord_t c2) const
-        {
-            const point_t &p1 = points_->at(i1);
-            return x_coord_ ? p1.x < c2 : p1.y < c2;
+            const point_t &p1 = points_->at(i1.i);
+            const point_t &p2 = points_->at(i2.i);
+            if (x_coord_)
+                return p1.x < p2.x || (p1.x == p2.x && p1.y < p2.y);
+            else
+                return p1.y < p2.y || (p1.y == p2.y && p1.x < p2.x);
         }
 
     private:
         const points_t *points_;
         bool x_coord_;
     };
+    
+    struct comparator2_t
+    {
+        comparator2_t(const points_t &points, bool x_coord, bool inf) 
+            : points_(&points) 
+            , x_coord_(x_coord)
+            , inf_(inf)
+        {}
 
+        bool operator()(index_t i1, coord_t c2) const
+        {
+            const point_t &p1 = points_->at(i1.i);
+
+            if (x_coord_)
+                return p1.x < c2 || p1.x == c2 && !inf_;
+            else
+                return p1.y < c2 || p1.y == c2 && !inf_;
+        }
+    private:
+        const points_t *points_;
+        bool x_coord_;
+        bool inf_;
+    };
+
+    subset_t prepare_subset() const 
+    {
+        subset_t s;
+        s.x = prepare_sorted(true);
+        s.y = prepare_sorted(false);
+        return s;
+    }
+    
     indices_t prepare_sorted(bool x_coord) const
     {
-        indices_t indices(points_.size());
-        for (index_t i = 0; i < indices.size(); ++i)
-            indices.at(i) = i;
+        indices_t indices(points_.size(), index_t(0));
+        for (size_t i = 0; i < indices.size(); ++i)
+            indices.at(i) = index_t(i);
 
         boost::sort(indices, comparator_t(points_, x_coord));
         
@@ -102,26 +137,35 @@ private:
 
     node_t::ptr build_tree() const 
     {
-        if (x_sorted_.empty())
-            return node_t::ptr();
-
-        return build_tree(x_sorted_.begin(), x_sorted_.end());
+        subset_t s(subset_);
+        return build_tree(s);
     }
 
-    node_t::ptr build_tree(it_t i_begin, it_t i_end) const
+    pair<subset_t> split_subset(const subset_t &s) const
     {
-        const size_t d1 = i_begin - x_sorted_.begin();
-        const size_t d2 = i_end   - x_sorted_.begin();
-        MY_ASSERT(i_begin < i_end);
-
-        
-        node_t::ptr l, r;
-        if (i_end - i_begin > 1)
+        MY_ASSERT(s.x.size() == s.y.size());
+        const size_t size = s.x.size();
+        const size_t med = size / 2;
+        for (size_t i = 0; i < size; ++i)
         {
-            const it_t i_med = i_begin + (i_end - i_begin) / 2;
-            const size_t dm = i_med - x_sorted_.begin();
-            l = build_tree(i_begin, i_med);
-            r = build_tree(i_med, i_end);
+            esaf
+        }
+
+        const it_t i_med = i_begin + (i_end - i_begin) / 2;
+        const size_t dm = i_med - x_sorted_.begin();
+        return make_pair(subset_t(), subset_t());
+    }
+    
+    node_t::ptr build_tree(const subset_t &s) const
+    {
+        MY_ASSERT(s.x.size() == s.y.size());
+        node_t::ptr l, r;
+        if (s.x.size() > 1)
+        {
+            auto split = split_subset(s);
+            
+            l = build_tree(split.first );
+            r = build_tree(split.second);
         }
         
         return node_t::create(assoc_struct_t(i_begin, i_end), l, r);
@@ -129,16 +173,17 @@ private:
 
     node_t::ptr find_split_node(const range_t &range) const
     {
-        const comparator_t comp(points_, true);
+        const comparator2_t inf_comp(points_, true, true);
+        const comparator2_t sup_comp(points_, true, false);
 
         node_t::ptr node = root_;
         while (!node->is_leaf())
         {
             const index_t index = node_x(node);
-            if (comp(index, range.sup) && !comp(index, range.inf))
+            if (sup_comp(index, range.sup) && !inf_comp(index, range.inf))
                 break;
 
-            node = (!comp(index, range.sup)) ? node->l() : node->r();
+            node = (!sup_comp(index, range.sup)) ? node->l() : node->r();
         }
         return node;
     }
@@ -148,9 +193,14 @@ private:
         return *(node->value().i_begin + (node->value().i_end - node->value().i_begin) / 2);
     }
 
+    const point_t &get_point(const index_t &index) const
+    {
+        return points_.at(index.i);
+    }
+
     void run_left(node_t::ptr start, const range_t &range, deque<node_t::ptr> &out_nodes) const
     {
-        const comparator_t comp(points_, true);
+        const comparator2_t comp(points_, true, true);
 
         node_t::ptr node = start->l();
         while(!node->is_leaf())
@@ -172,7 +222,7 @@ private:
 
     void run_right(node_t::ptr start, const range_t &range, deque<node_t::ptr> &out_nodes) const
     {
-        const comparator_t comp(points_, true);
+        const comparator2_t comp(points_, true, false);
 
         node_t::ptr node = start->r();
         while(!node->is_leaf())
@@ -192,15 +242,17 @@ private:
             out_nodes.push_front(node);
     }
 
-    indices_t select_indices(const deque<node_t::ptr> &nodes) const
+    vector<size_t> select_indices(const deque<node_t::ptr> &nodes) const
     {
-        indices_t indices;
+        vector<size_t> result;
         for (auto it = nodes.begin(); it != nodes.end(); ++it)
         {
             node_t::ptr node = *it;
-            std::copy(node->value().i_begin, node->value().i_end, std::back_inserter(indices));
+            
+            std::transform(node->value().i_begin, node->value().i_end, std::back_inserter(result),
+                [](const index_t &index) { return index.i; } );
         }
-        return indices;
+        return result;
     }
 
     bool ok() const
@@ -213,6 +265,6 @@ private:
 
 private:    
     points_t points_;
-    indices_t x_sorted_, y_sorted_;
+    subset_t subset_;
     node_t::ptr root_;
 };
