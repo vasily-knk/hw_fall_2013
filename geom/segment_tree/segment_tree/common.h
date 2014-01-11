@@ -17,6 +17,8 @@ using std::map;
 using std::set;
 #include <vector>
 using std::vector;
+#include <deque>
+using std::deque;
 
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
@@ -47,3 +49,14 @@ using boost::optional;
 #include <Windows.h>
 #endif
 
+#define OUT_ARG(x) x
+
+struct my_assert 
+    : std::runtime_error
+{
+    my_assert(const string &msg)
+        : std::runtime_error(msg)
+    { }
+};
+
+#define MY_ASSERT(cond) if (!(cond)) { throw my_assert(#cond); }
