@@ -20,6 +20,10 @@ using std::vector;
 #include <deque>
 using std::deque;
 
+#include <algorithm>
+using std::pair;
+using std::make_pair;
+
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
@@ -42,6 +46,7 @@ using boost::optional;
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/range/algorithm_ext/is_sorted.hpp>
 
 #include <stdexcept>
 

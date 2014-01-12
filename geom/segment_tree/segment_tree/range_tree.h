@@ -26,7 +26,6 @@ struct range_tree_t
         if (node->is_leaf())
         {
             const assoc_struct_t &as = node->value();
-            MY_ASSERT(as.i_end - as.i_begin == 1);
             nodes.push_back(node);
         }
         else
@@ -60,13 +59,13 @@ private:
     
     struct assoc_struct_t 
     {
-        assoc_struct_t(it_t i_begin, it_t i_end) 
-            : i_begin(i_begin)
-            , i_end(i_end)
+        assoc_struct_t (subset_t const &s)
+            : s(s)
         {
-            MY_ASSERT(i_begin < i_end);
+
         }
-        it_t i_begin, i_end;
+
+        subset_t s;
     };
     typedef node_base_t<assoc_struct_t> node_t;
 
@@ -119,7 +118,7 @@ private:
     subset_t prepare_subset() const 
     {
         subset_t s;
-        s.x = prepare_sorted(true);
+        s.x = prepare_sorted(true );
         s.y = prepare_sorted(false);
         return s;
     }
@@ -141,24 +140,46 @@ private:
         return build_tree(s);
     }
 
-    pair<subset_t> split_subset(const subset_t &s) const
+    bool check_subset(const subset_t &s) const
     {
         MY_ASSERT(s.x.size() == s.y.size());
+        MY_ASSERT(boost::is_sorted(s.x, comparator_t(points_, true )));
+        MY_ASSERT(boost::is_sorted(s.y, comparator_t(points_, false)));
+        return true;
+    }
+    
+    pair<subset_t, subset_t> split_subset(const subset_t &s) const
+    {
+        pair<subset_t, subset_t> result;
+
         const size_t size = s.x.size();
         const size_t med = size / 2;
-        for (size_t i = 0; i < size; ++i)
+        const index_t med_index = s.x.at(med);
+
+        std::copy(s.x.begin(), s.x.begin() + med, std::back_inserter(result.first .x));
+        std::copy(s.x.begin() + med, s.x.end()  , std::back_inserter(result.second.x));
+
+        comparator_t x_comp(points_, true);
+        BOOST_FOREACH(const index_t &index, s.y)
         {
-            esaf
+            if (x_comp(index, med_index))
+                result.first.y.push_back(index);
+            else
+                result.second.y.push_back(index);
         }
 
-        const it_t i_med = i_begin + (i_end - i_begin) / 2;
-        const size_t dm = i_med - x_sorted_.begin();
-        return make_pair(subset_t(), subset_t());
+
+        MY_ASSERT(check_subset(result.first ));
+        MY_ASSERT(check_subset(result.second));
+        MY_ASSERT(abs(int64_t(result.first.x.size()) - int64_t(result.second.x.size())) <= 1);
+        
+        return result;
     }
     
     node_t::ptr build_tree(const subset_t &s) const
     {
         MY_ASSERT(s.x.size() == s.y.size());
+
         node_t::ptr l, r;
         if (s.x.size() > 1)
         {
@@ -168,7 +189,7 @@ private:
             r = build_tree(split.second);
         }
         
-        return node_t::create(assoc_struct_t(i_begin, i_end), l, r);
+        return node_t::create(assoc_struct_t(s), l, r);
     }
 
     node_t::ptr find_split_node(const range_t &range) const
@@ -190,7 +211,8 @@ private:
 
     index_t node_x(node_t::ptr node) const
     {
-        return *(node->value().i_begin + (node->value().i_end - node->value().i_begin) / 2);
+        const indices_t &xs = node->value().s.x;
+        return xs.at(xs.size() / 2);
     }
 
     const point_t &get_point(const index_t &index) const
@@ -249,7 +271,7 @@ private:
         {
             node_t::ptr node = *it;
             
-            std::transform(node->value().i_begin, node->value().i_end, std::back_inserter(result),
+            boost::transform(node->value().s.y, std::back_inserter(result),
                 [](const index_t &index) { return index.i; } );
         }
         return result;
@@ -258,8 +280,7 @@ private:
     bool ok() const
     {
         MY_ASSERT(root_ || points_.empty());
-        MY_ASSERT(points_.size() == x_sorted_.size());
-        MY_ASSERT(points_.size() == y_sorted_.size());
+        check_subset(subset_);
         return true;
     }
 
