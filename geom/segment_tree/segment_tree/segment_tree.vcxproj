@@ -80,12 +80,13 @@
     <ClInclude Include="common.h" />
     <ClInclude Include="primitives.h" />
     <ClInclude Include="range_tree.h" />
+    <ClInclude Include="segment_tree.h" />
+    <ClInclude Include="segment_windowing.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="tree.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="segments.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

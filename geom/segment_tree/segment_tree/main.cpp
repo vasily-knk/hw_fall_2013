@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "primitives.h"
-#include "range_tree.h"
+#include "segment_windowing.h"
 
-int main()
+void range_test()
 {
     vector<point_t> points;
     vector<range_t> ranges;
@@ -63,4 +63,23 @@ int main()
         }
 
     }
+}
+
+void segment_test()
+{
+    vector<segment_t> segments;
+    segments.push_back(segment_t(point_t(0, 0), point_t(100, 20)));
+    segments.push_back(segment_t(point_t(0, 50), point_t(50, 20)));
+    segments.push_back(segment_t(point_t(40, 40), point_t(100, 40)));
+    windowing_t t(segments);
+
+    auto result = t.query(range_t(35, 105), range_t(35, 45));
+    BOOST_FOREACH(auto index, result)
+        cout << index << endl;
+
+};
+
+void main()
+{
+    segment_test();
 }
