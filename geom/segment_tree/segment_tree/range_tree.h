@@ -15,14 +15,14 @@ struct range_tree_t
         MY_ASSERT(ok());
     }
 
-    vector<size_t> query(range_t range) const
+    vector<size_t> query(const range_t &x_range, const range_t &y_range) const
     {
         if (!root_)
             return vector<size_t>();
         
         deque<node_t::ptr> nodes;
 
-        node_t::ptr node = find_split_node(range);
+        node_t::ptr node = find_split_node(x_range);
         if (node->is_leaf())
         {
             const assoc_struct_t &as = node->value();
@@ -30,11 +30,11 @@ struct range_tree_t
         }
         else
         {
-            run_left (node, range, OUT_ARG(nodes));
-            run_right(node, range, OUT_ARG(nodes));
+            run_left (node, x_range, OUT_ARG(nodes));
+            run_right(node, x_range, OUT_ARG(nodes));
         }
 
-        return select_indices(nodes);
+        return select_indices(nodes, y_range);
     }
 
     const points_t &points() const
@@ -55,7 +55,6 @@ private:
     {
         indices_t x, y;
     };
-    typedef indices_t::const_iterator it_t;
     
     struct assoc_struct_t 
     {
@@ -97,7 +96,6 @@ private:
         comparator2_t(const points_t &points, bool x_coord, bool inf) 
             : points_(&points) 
             , x_coord_(x_coord)
-            , inf_(inf)
         {}
 
         bool operator()(index_t i1, coord_t c2) const
@@ -105,14 +103,14 @@ private:
             const point_t &p1 = points_->at(i1.i);
 
             if (x_coord_)
-                return p1.x < c2 || p1.x == c2 && !inf_;
+                return p1.x < c2;
             else
-                return p1.y < c2 || p1.y == c2 && !inf_;
+                return p1.y < c2;
         }
+
     private:
         const points_t *points_;
         bool x_coord_;
-        bool inf_;
     };
 
     subset_t prepare_subset() const 
@@ -231,7 +229,7 @@ private:
             // x_v >= x
             if (!comp(index, range.inf))
             {
-                out_nodes.push_back(node->r());
+                out_nodes.push_front(node->r());
                 node = node->l();
             }
             else
@@ -239,7 +237,7 @@ private:
         }
         const index_t index = node_x(node);
         if (!comp(index, range.inf))
-            out_nodes.push_back(node);
+            out_nodes.push_front(node);
     }
 
     void run_right(node_t::ptr start, const range_t &range, deque<node_t::ptr> &out_nodes) const
@@ -253,7 +251,7 @@ private:
             // x_v < x'
             if (comp(index, range.sup))
             {
-                out_nodes.push_front(node->l());
+                out_nodes.push_back(node->l());
                 node = node->r();
             }
             else
@@ -261,17 +259,22 @@ private:
         }
         const index_t index = node_x(node);
         if (comp(index, range.sup))
-            out_nodes.push_front(node);
+            out_nodes.push_back(node);
     }
 
-    vector<size_t> select_indices(const deque<node_t::ptr> &nodes) const
+    vector<size_t> select_indices(const deque<node_t::ptr> &nodes, const range_t &y_range) const
     {
         vector<size_t> result;
         for (auto it = nodes.begin(); it != nodes.end(); ++it)
         {
             node_t::ptr node = *it;
+
+            const indices_t &y_indices = node->value().s.y;
+
+            const auto it1 = boost::lower_bound(y_indices, y_range.inf, comparator2_t(points_, false, true));
+            const auto it2 = boost::lower_bound(y_indices, y_range.sup, comparator2_t(points_, false, true));
             
-            boost::transform(node->value().s.y, std::back_inserter(result),
+            std::transform(it1, it2, std::back_inserter(result),
                 [](const index_t &index) { return index.i; } );
         }
         return result;
