@@ -50,9 +50,27 @@ private:
         size_t i;
     };
     typedef vector<index_t> indices_t;
+    
+    // structure used for cascading
+    struct layered_index_t
+    {
+        index_t i;
+        optional<size_t> l, r;
+
+        layered_index_t(const index_t &i)
+            : i(i)
+        {}
+        
+        operator const index_t&() const
+        {
+            return i;
+        }
+    };
+    
     struct subset_t
     {
-        indices_t x, y;
+        vector<index_t> x;
+        vector<layered_index_t> y;
     };
     
     struct assoc_struct_t 
@@ -115,14 +133,15 @@ private:
     subset_t prepare_subset() const 
     {
         subset_t s;
-        s.x = prepare_sorted(true );
-        s.y = prepare_sorted(false);
+        s.x = prepare_sorted<index_t>(true );
+        s.y = prepare_sorted<layered_index_t>(false);
         return s;
     }
     
-    indices_t prepare_sorted(bool x_coord) const
+    template<typename T>
+    vector<T> prepare_sorted(bool x_coord) const
     {
-        indices_t indices(points_.size(), index_t(0));
+        vector<T> indices(points_.size(), index_t(0));
         for (size_t i = 0; i < indices.size(); ++i)
             indices.at(i) = index_t(i);
 
@@ -144,8 +163,41 @@ private:
         MY_ASSERT(boost::is_sorted(s.y, comparator_t(points_, false)));
         return true;
     }
+
+    bool check_cascades(node_t::ptr node) const
+    {
+        if (!node->l() && !node->r())
+            return true;
+
+        const vector<layered_index_t> &layered_indices = node->value().s.y;
+        const vector<layered_index_t> &left  = node->l()->value().s.y;
+        const vector<layered_index_t> &right = node->r()->value().s.y;
+
+        comparator_t comp(points_, false);
+        BOOST_FOREACH(const layered_index_t &layered_index, layered_indices)
+        {
+            if (layered_index.l)
+            {
+                const size_t p = *layered_index.l;
+                MY_ASSERT(!comp(left.at(p), layered_index));
+                MY_ASSERT(p == 0 || comp(left.at(p - 1), layered_index))
+            }
+
+            if (layered_index.r)
+            {
+                const size_t p = *layered_index.r;
+                MY_ASSERT(!comp(right.at(p), layered_index));
+                MY_ASSERT(p == 0 || comp(right.at(p - 1), layered_index))
+            }
+        }
+
+        check_cascades(node->l());
+        check_cascades(node->r());
+
+        return true;
+    }
     
-    pair<subset_t, subset_t> split_subset(const subset_t &s) const
+    pair<subset_t, subset_t> split_subset(subset_t &s) const
     {
         pair<subset_t, subset_t> result;
 
@@ -156,15 +208,38 @@ private:
         std::copy(s.x.begin(), s.x.begin() + med, std::back_inserter(result.first .x));
         std::copy(s.x.begin() + med, s.x.end()  , std::back_inserter(result.second.x));
 
+        
+        auto &left  = result.first .y;
+        auto &right = result.second.y;
+        
         comparator_t x_comp(points_, true);
-        BOOST_FOREACH(const index_t &index, s.y)
+        BOOST_FOREACH(const layered_index_t &layered_index, s.y)
         {
-            if (x_comp(index, med_index))
-                result.first.y.push_back(index);
+            if (x_comp(layered_index.i, med_index))
+                left.push_back(layered_index.i);
             else
-                result.second.y.push_back(index);
+                right.push_back(layered_index.i);
         }
 
+        comparator_t y_comp(points_, false);
+        size_t lptr = 0, rptr = 0;
+        BOOST_FOREACH(layered_index_t &layered_index, s.y)
+        {
+            MY_ASSERT(!layered_index.l && !layered_index.r);
+
+            while (lptr < left .size() && y_comp(left .at(lptr), layered_index)) ++lptr;
+            while (rptr < right.size() && y_comp(right.at(rptr), layered_index)) ++rptr;
+
+            // check if linked item is the least one that is >= current
+            MY_ASSERT(lptr == left .size() || (!y_comp(left .at(lptr), layered_index) && (lptr == 0 || y_comp(left .at(lptr - 1), layered_index))));
+            MY_ASSERT(rptr == right.size() || (!y_comp(right.at(rptr), layered_index) && (rptr == 0 || y_comp(right.at(rptr - 1), layered_index))));
+
+            if (lptr < left.size())
+                layered_index.l = lptr;
+
+            if (rptr < right.size())
+                layered_index.r = rptr;
+        }
 
         MY_ASSERT(check_subset(result.first ));
         MY_ASSERT(check_subset(result.second));
@@ -173,8 +248,9 @@ private:
         return result;
     }
     
-    node_t::ptr build_tree(const subset_t &s) const
+    node_t::ptr build_tree(const subset_t &old_s) const
     {
+        subset_t s = old_s;
         MY_ASSERT(s.x.size() == s.y.size());
 
         node_t::ptr l, r;
@@ -208,7 +284,7 @@ private:
 
     index_t node_x(node_t::ptr node) const
     {
-        const indices_t &xs = node->value().s.x;
+        const auto &xs = node->value().s.x;
         return xs.at(xs.size() / 2);
     }
 
@@ -268,7 +344,7 @@ private:
         {
             node_t::ptr node = *it;
 
-            const indices_t &y_indices = node->value().s.y;
+            const vector<layered_index_t> &y_indices = node->value().s.y;
 
             const auto it1 = boost::lower_bound(y_indices, y_range.inf, comparator2_t(points_, false, true));
             const auto it2 = boost::lower_bound(y_indices, y_range.sup, comparator2_t(points_, false, true));
@@ -283,6 +359,7 @@ private:
     {
         MY_ASSERT(root_ || points_.empty());
         check_subset(subset_);
+        check_cascades(root_);
         return true;
     }
 

@@ -29,3 +29,5 @@ HEADERS += \
 
 SOURCES += \ 
 	main.cpp \
+
+LIBS += -lvisualization
