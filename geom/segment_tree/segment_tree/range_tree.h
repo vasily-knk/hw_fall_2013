@@ -25,7 +25,6 @@ struct range_tree_t
         node_t::ptr node = find_split_node(x_range);
         if (node->is_leaf())
         {
-            const assoc_struct_t &as = node->value();
             nodes.push_back(node);
         }
         else
@@ -93,7 +92,7 @@ private:
     
     struct comparator2_t
     {
-        comparator2_t(const points_t &points, bool x_coord, bool inf) 
+        comparator2_t(const points_t &points, bool x_coord, bool /*inf*/) 
             : points_(&points) 
             , x_coord_(x_coord)
         {}

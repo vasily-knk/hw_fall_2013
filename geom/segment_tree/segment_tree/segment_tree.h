@@ -3,7 +3,7 @@
 #include "primitives.h"
 #include "tree.h"
 
-struct segment_t
+/*struct segment_t
 {
     segment_t(point_t const &p1, point_t const &p2)
         : p1(p1)
@@ -19,20 +19,30 @@ struct segment_t
     }
 
     point_t p1, p2;
-};
+};*/
+
+inline range_t x_range(const segment_t &segment)
+{
+    return range_t(std::min(segment[0].x, segment[1].x), std::max(segment[0].x, segment[1].x));
+}
+
+inline range_t y_range(const segment_t &segment)
+{
+    return range_t(std::min(segment[0].y, segment[1].y), std::max(segment[0].y, segment[1].y));
+}
 
 inline coord_t value_for_x(const segment_t &segment, coord_t x)
 {
-    const range_t rg = segment.x_range();
+    const range_t rg = x_range(segment);
     if (!rg.contains(x))
         throw std::logic_error("x value outside segment");
 
-    if (segment.p1.x == segment.p2.x)
-        return segment.p1.y;
+    if (segment[0].x == segment[1].x)
+        return segment[0].y;
 
-    const double ratio = double(x - segment.p1.x) / double(segment.p2.x - segment.p1.x);
-    const double offset = ratio * double(segment.p2.y - segment.p1.y);
-    return segment.p1.y + coord_t(offset);
+    const double ratio = double(x - segment[0].x) / double(segment[1].x - segment[0].x);
+    const double offset = ratio * double(segment[1].y - segment[0].y);
+    return segment[0].y + coord_t(offset);
 }
 
 struct segment_tree_t
@@ -158,7 +168,7 @@ private:
 
     static range_t segment2range(const segment_t &segment) 
     {
-        return segment.x_range();
+        return x_range(segment);
     }
 
 private:

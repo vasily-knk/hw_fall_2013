@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "primitives.h"
 #include "segment_windowing.h"
+#include "visualization/viewer_adapter.h"
+#include "visualization/draw_util.h"
 
 void range_test()
 {
@@ -51,17 +53,14 @@ void range_test()
             returned.at(index) = true;
             const point_t point = range_tree.points().at(index);
             MY_ASSERT(point.x >= x_range.inf && point.x < x_range.sup && point.y >= y_range.inf && point.y < y_range.sup);
-            int aaa = 6;
         }
 
-        for (size_t index = 0; i < range_tree.points().size(); ++i)
+        for (size_t index = 0; index < range_tree.points().size(); ++index)
         {
-            const point_t point = range_tree.points().at(i);
-            if (!returned.at(i))
+            const point_t point = range_tree.points().at(index);
+            if (!returned.at(index))
                 MY_ASSERT(point.x < x_range.inf || point.x >= x_range.sup || point.y < y_range.inf || point.y >= y_range.sup);
-            int aaa = 6;
         }
-
     }
 }
 
@@ -79,7 +78,161 @@ void segment_test()
 
 };
 
-void main()
+
+namespace visualization
 {
-    segment_test();
+
+    struct segment_tree_viewer
+        : viewer_adapter    
+    {
+        void draw(drawer_type & drawer) const override
+        {
+            for (size_t i = 0; i < segments_.size(); ++i)
+            {
+                drawer.set_color(indices_.count(i) ? Qt::red : Qt::blue);
+                draw_segment(drawer, segments_.at(i));
+            }
+
+            if (new_segment_)
+            {
+                drawer.set_color(Qt::cyan);
+                draw_segment(drawer, *new_segment_);
+            }
+
+            if (window_)
+            {
+                drawer.set_color(Qt::green);
+                draw_rect(drawer, *window_);
+            }
+            
+            if (old_window_)
+            {
+                drawer.set_color(Qt::darkGreen);
+                draw_rect(drawer, *old_window_);
+            }
+        }
+
+        bool on_press(point_type const & pt) override
+        {
+            if (window_)
+            {
+                window_click(pt);
+            }
+            else if (!new_segment_)
+            {
+                new_segment_ = segment_t(pt, pt);
+            }
+            else
+            {
+                segments_.push_back(*new_segment_);
+                new_segment_.reset();
+                windowing_.reset();
+            }
+
+            return true;
+        }
+
+        bool on_key(int key)
+        {
+            switch(key)
+            {
+            case Qt::Key_Escape:
+                window_.reset();
+                new_segment_.reset();
+                break;
+            case Qt::Key_Space:
+                window_click(last_mouse_);
+                break;
+
+            default:
+                return false;
+            }
+            return true;
+        }
+
+        bool on_move(point_type const &pt) override
+        {
+            last_mouse_ = pt;
+            if (window_)
+            {
+                (*window_)[1] = pt;
+                update_indices(*window_);
+                return true;
+            }
+            else if (new_segment_)
+            {
+                (*new_segment_)[1] = pt;
+                return true;
+            }
+            return false;
+        }
+    private:
+        void draw_segment(drawer_type & drawer, const segment_t &s) const
+        {
+            drawer.draw_point(s[0], 3);
+            drawer.draw_point(s[1], 3);
+            drawer.draw_line(s, 1);
+        }
+
+        void draw_rect(drawer_type & drawer, const segment_t &s) const 
+        {
+            const point_t p1 = s[0];
+            const point_t p2 = point_t(s[0].x, s[1].y);
+            const point_t p3 = s[1];
+            const point_t p4 = point_t(s[1].x, s[0].y);
+
+            drawer.draw_line(p1, p2);
+            drawer.draw_line(p2, p3);
+            drawer.draw_line(p3, p4);
+            drawer.draw_line(p4, p1);
+        }
+
+        void window_click(point_type const &pt)
+        {
+            new_segment_.reset();
+            if (window_)
+            {
+                old_window_ = window_;
+                window_.reset();
+            }
+            else
+            {
+                window_ = segment_t(pt, pt);
+                build_struct();
+                old_window_.reset();
+            }
+        }
+
+        void build_struct()
+        {
+            if (windowing_)
+                return;
+
+            windowing_ = boost::make_shared<windowing_t>(segments_);
+        }
+
+        void update_indices(const segment_t &s)
+        {
+            indices_ = windowing_->query(x_range(s), y_range(s));
+        }
+
+    private:
+        vector<segment_t> segments_; 
+        optional<segment_t> new_segment_;
+        optional<segment_t> window_, old_window_;
+        point_t last_mouse_;
+
+        shared_ptr<windowing_t> windowing_;
+        windowing_t::indices_t indices_;
+    };
+}
+
+
+
+void main(int argc, char** argv)
+{
+    QApplication app(argc, argv);
+    visualization::segment_tree_viewer viewer;
+    visualization::run_viewer(&viewer, "Segment tree");
+//segment_test();
 }

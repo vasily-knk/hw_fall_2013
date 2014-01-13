@@ -49,7 +49,7 @@ private:
         boost::transform(segments, std::back_inserter(res),
             [](const segment_t &s)
         {
-            return segment_t(point_t(s.p1.y, s.p1.x), point_t(s.p2.y, s.p2.x));
+            return segment_t(point_t(s[0].y, s[0].x), point_t(s[1].y, s[1].x));
         });
         return res;
     }
@@ -61,8 +61,8 @@ private:
 
         for (size_t i = 0; i < segments.size(); ++i)
         {
-            points.at(i * 2 + 0) = segments.at(i).p1;
-            points.at(i * 2 + 1) = segments.at(i).p2;
+            points.at(i * 2 + 0) = segments.at(i)[0];
+            points.at(i * 2 + 1) = segments.at(i)[1];
         }
         
         return points;

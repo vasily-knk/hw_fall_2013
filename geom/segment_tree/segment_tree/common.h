@@ -58,6 +58,8 @@ using boost::optional;
 #include <Windows.h>
 #endif
 
+#include <QApplication>
+
 #define OUT_ARG(x) x
 
 struct my_assert 

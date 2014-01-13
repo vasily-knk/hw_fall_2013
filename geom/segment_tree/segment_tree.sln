@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "segment_tree", "segment_tree\segment_tree.vcxproj", "{21FBECC6-AE8E-4533-A0DB-4C6A9F8C323F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "segment_tree", "segment_tree\segment_tree.vcxproj", "{3B02E2D7-4320-366D-BD82-D0D104357020}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "visualization", "visualization\visualization.vcxproj", "{CCC556FC-DD52-30B2-AB6A-88815DEF773A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,10 +11,14 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{21FBECC6-AE8E-4533-A0DB-4C6A9F8C323F}.Debug|Win32.ActiveCfg = Debug|Win32
-		{21FBECC6-AE8E-4533-A0DB-4C6A9F8C323F}.Debug|Win32.Build.0 = Debug|Win32
-		{21FBECC6-AE8E-4533-A0DB-4C6A9F8C323F}.Release|Win32.ActiveCfg = Release|Win32
-		{21FBECC6-AE8E-4533-A0DB-4C6A9F8C323F}.Release|Win32.Build.0 = Release|Win32
+		{3B02E2D7-4320-366D-BD82-D0D104357020}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3B02E2D7-4320-366D-BD82-D0D104357020}.Debug|Win32.Build.0 = Debug|Win32
+		{3B02E2D7-4320-366D-BD82-D0D104357020}.Release|Win32.ActiveCfg = Release|Win32
+		{3B02E2D7-4320-366D-BD82-D0D104357020}.Release|Win32.Build.0 = Release|Win32
+		{CCC556FC-DD52-30B2-AB6A-88815DEF773A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CCC556FC-DD52-30B2-AB6A-88815DEF773A}.Debug|Win32.Build.0 = Debug|Win32
+		{CCC556FC-DD52-30B2-AB6A-88815DEF773A}.Release|Win32.ActiveCfg = Release|Win32
+		{CCC556FC-DD52-30B2-AB6A-88815DEF773A}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
