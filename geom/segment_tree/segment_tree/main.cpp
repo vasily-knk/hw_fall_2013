@@ -9,7 +9,7 @@ void range_test()
     vector<point_t> points;
     vector<range_t> ranges;
 
-/*
+
     for (size_t i = 0; i < 1000; ++i)
     {
         const coord_t x = rand();
@@ -28,19 +28,21 @@ void range_test()
 
         ranges.push_back(range_t(inf, sup));
     }
-*/
 
 
+
+/*
     for (size_t i = 0; i < 10; ++i)
         points.push_back(point_t(i,  5));
+*/
 
 
     const range_tree_t range_tree(points);
 
-    auto ind = range_tree.query(range_t(2, 8), range_t(4, 9));
+//    auto ind = range_tree.query(range_t(2, 8), range_t(4, 9));
 
     vector<bool> returned;
-    for (size_t i = 0; i < ranges.size(); ++i)
+    for (size_t i = 0; i < ranges.size() / 2; ++i)
     {
         returned.resize(range_tree.points().size(), false);
         
@@ -234,5 +236,5 @@ void main(int argc, char** argv)
     QApplication app(argc, argv);
     visualization::segment_tree_viewer viewer;
     visualization::run_viewer(&viewer, "Segment tree");
-//segment_test();
+    //range_test();
 }
