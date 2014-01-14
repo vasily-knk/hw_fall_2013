@@ -24,10 +24,10 @@ HEADERS += \
 	segment_tree.h \
 	segment_windowing.h \
 	stdafx.h \
-	tree.h \
+	tree.h
 
 
 SOURCES += \ 
-	main.cpp \
+	main.cpp
 
-LIBS += -lvisualization
+LIBS += -L../visualization -lvisualization

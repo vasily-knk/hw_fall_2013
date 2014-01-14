@@ -3,23 +3,6 @@
 #include "primitives.h"
 #include "tree.h"
 
-/*struct segment_t
-{
-    segment_t(point_t const &p1, point_t const &p2)
-        : p1(p1)
-        , p2(p2)
-    {}
-
-    range_t x_range() const { return range_t(std::min(p1.x, p2.x), std::max(p1.x, p2.x)); }
-    range_t y_range() const { return range_t(std::min(p1.y, p2.y), std::max(p1.y, p2.y)); }
-
-    bool lower(const segment_t &other) const
-    {
-        return true; // fixme
-    }
-
-    point_t p1, p2;
-};*/
 
 inline range_t x_range(const segment_t &segment)
 {
