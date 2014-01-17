@@ -56,6 +56,8 @@ int main(int argc, char* argv[])
     {
         string cmd;
         std::getline(std::cin, cmd);
+        if (!pool)
+            break;
 
         vector<string> parts;
 
