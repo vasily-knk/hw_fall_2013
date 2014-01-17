@@ -35,6 +35,7 @@ using std::make_pair;
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
 
 using boost::shared_ptr;
 using boost::make_shared;

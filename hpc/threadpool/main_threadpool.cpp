@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "threadpool.h"
 
+#include <signal.h>
 
+boost::scoped_ptr<threadpool> pool;
 boost::mutex cout_mutex;
 
 struct args_t
@@ -34,15 +36,23 @@ optional<args_t> parse_args(int argc, char* argv[])
     return res;
 }
 
+void sig_handler(int /*signum*/)
+{
+    pool.reset();
+}
+
 int main(int argc, char* argv[])
 {
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
+
     auto args = parse_args(argc, argv);
     if (!args)
         return 1;
 
-    threadpool pool(args->num_hot_threads, args->timeout);
+    pool.reset(new threadpool(args->num_hot_threads, args->timeout));
 
-    while (true)
+    while (pool)
     {
         string cmd;
         std::getline(std::cin, cmd);
@@ -59,7 +69,7 @@ int main(int argc, char* argv[])
                 if (parts.at(0) == "add")
                 {
                     int seconds = boost::lexical_cast<int>(parts.at(1));
-                    auto task_id = pool.add_task(sleep_task(seconds));
+                    auto task_id = pool->add_task(sleep_task(seconds));
 
                     boost::mutex::scoped_lock l(cout_mutex);
                     cout << "Task id: " << task_id << endl;
@@ -68,7 +78,7 @@ int main(int argc, char* argv[])
                 else if (parts.at(0) == "cancel")
                 {
                     auto task_id = boost::lexical_cast<threadpool::task_id_t>(parts.at(1));
-                    auto res = pool.cancel_task(task_id);
+                    auto res = pool->cancel_task(task_id);
 
                     boost::mutex::scoped_lock l(cout_mutex);
                     cout << "Task " << task_id << " ";

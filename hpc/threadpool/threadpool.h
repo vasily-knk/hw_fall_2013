@@ -56,13 +56,7 @@ public:
 
     ~threadpool()
     {
-        clear_queue();
-        
-        time_to_die_ = true;
-        tasks_cond_.notify_all();
-
-        BOOST_FOREACH(const auto &t, threads_)
-            t.second->join();
+        cleanup();
     }
 
 public:
@@ -235,6 +229,17 @@ private:
     {
         mutex_lock_t lock(tasks_mutex_);
         tasks_queue_.swap(queue<pair<uint64_t, task_t>>());
+    }
+
+    void cleanup()
+    {
+        clear_queue();
+
+        time_to_die_ = true;
+        tasks_cond_.notify_all();
+
+        BOOST_FOREACH(const auto &t, threads_)
+            t.second->join();
     }
 
 private:
