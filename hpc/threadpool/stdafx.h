@@ -17,8 +17,8 @@ using std::map;
 using std::set;
 #include <vector>
 using std::vector;
-#include <deque>
-using std::deque;
+#include <queue>
+using std::queue;
 #include <unordered_map>
 using std::unordered_map;
 #include <unordered_set>
