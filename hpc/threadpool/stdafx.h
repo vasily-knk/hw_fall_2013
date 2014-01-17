@@ -59,12 +59,4 @@ using boost::optional;
 
 #define OUT_ARG(x) x
 
-struct my_assert 
-    : std::runtime_error
-{
-    my_assert(const string &msg)
-        : std::runtime_error(msg)
-    { }
-};
-
-#define MY_ASSERT(cond) if (!(cond)) { throw my_assert(#cond); }
+#define MY_ASSERT assert

@@ -18,6 +18,7 @@ private:
 };
 
 struct threadpool
+    : boost::noncopyable
 {
     typedef boost::function<void()> task_t;
     typedef uint64_t task_id_t;
@@ -38,42 +39,18 @@ private:
 
     typedef size_t thread_id_t;
 
-private:
-
-/*    struct task_assignation
-    {
-    task_assignation(threadpool *owner, thread_id_t thread_id, pt::time_duration time)
-        : owner_(owner)
-    {
-        task_data_ = owner_->assign_task(thread_id, time);
-    }
-    
-    const pair<task_id_t, task_t> &task_data() const
-    {
-        return task_data_
-    }
-
-    ~task_assignation()
-    {
-        owner_->unassign_task(task_data_->first);
-    }
-
-    private:
-        threadpool *owner_;
-        optional<pair<task_id_t, task_t>> task_data_;
-    };*/
-
 public:
-
-    threadpool(size_t num_threads)
+    threadpool(size_t num_threads, pt::time_duration timeout)
         : next_task_id_(0)
         , next_thread_id_(0)
         , time_to_die_(false)
+        , timeout_(timeout)
     {
+        mutex_lock_t lock(tasks_mutex_);
+        
         for (size_t i = 0; i < num_threads; ++i)
         {
-            auto t = make_shared<boost::thread>(boost::bind(&threadpool::thread_run, this, i, true));
-            threads_.insert(make_pair(next_thread_id_++, t));
+            create_thread();
         }
     }
 
@@ -95,9 +72,22 @@ public:
         const task_id_t task_id = next_task_id_++;
         tasks_threads_.insert(make_pair(task_id, boost::none));
         tasks_queue_.push(make_pair(task_id, task));
+
+        if (idle_threads_.empty())
+            create_thread(timeout_);
+
+        MY_ASSERT(!idle_threads_.empty());
         
         tasks_cond_.notify_one();
         return task_id;
+    }
+
+    void create_thread(optional<pt::time_duration> timeout = boost::none)
+    {
+        thread_id_t id = next_thread_id_++;
+        auto t = make_shared<boost::thread>(boost::bind(&threadpool::thread_run, this, id, timeout));
+        threads_.insert(make_pair(id, t));
+        idle_threads_.insert(id);
     }
 
     cancel_result_t cancel_task(task_id_t task_id)
@@ -120,8 +110,13 @@ public:
     }
 
 private:
-    void thread_run(thread_id_t thread_id, bool hot)
+    void thread_run(thread_id_t thread_id, optional<pt::time_duration> timeout)
     {
+        {
+            mutex_lock_t l(cout_mutex);
+            cout << (timeout ? "Worker" : "Hot");
+            cout << " thread " << thread_id << " created" << endl;
+        }
         while (!time_to_die_)
         {
             try
@@ -134,51 +129,60 @@ private:
                 cout << "Thread " << thread_id << " had a late interruption" << endl;
             }
 
-            const auto task = assign_task(thread_id, boost::none);
+            const auto task = assign_task(thread_id, timeout);
             if (!task)
             {
-                MY_ASSERT(!hot || time_to_die_);
+                MY_ASSERT(timeout || time_to_die_);
                 break;
             }
 
             {
                 mutex_lock_t l(cout_mutex);
-                cout << "Task " << task->first << " executed on thread " << thread_id << endl;
+                cout << "Task " << task->first << " assigned on thread " << thread_id << endl;
             }
 
-            run_task(thread_id, task->second);
+            const bool task_finished = run_task(thread_id, task->second);
 
             unassign_task(thread_id, task->first);
 
-            {
-                mutex_lock_t l(cout_mutex);
-                cout << "Task " << task->first << " finished on thread " << thread_id << endl;
-            }
+            mutex_lock_t l(cout_mutex);
+            cout << "Task " << task->first << " ";
+            cout << (task_finished ? "finished" : "canceled");
+            cout << " on thread " << thread_id << endl;
         }
 
         {
             mutex_lock_t l(cout_mutex);
             cout << "Thread " << thread_id << " finished" << endl;
         }
+
+        {
+            mutex_lock_t lock(tasks_mutex_);
+            MY_ASSERT(idle_threads_.count(thread_id));
+            idle_threads_.erase(thread_id);
+        }
     }
 
-    void run_task(thread_id_t thread_id, task_t task)
+    bool run_task(thread_id_t thread_id, task_t task)
     {
         try
         {
             // run the task
             task();
+            return true;
         }
-        catch (boost::thread_interrupted const&)
+        catch (boost::thread_interrupted const&) 
         {
-            mutex_lock_t l(cout_mutex);
-            cout << "Thread " << thread_id << " interrupted" << endl;
+            return false;
         }
     }
 
     optional<pair<uint64_t, task_t>> assign_task(thread_id_t thread_id, optional<pt::time_duration> time)
     {
         mutex_lock_t lock(tasks_mutex_);
+
+        MY_ASSERT(idle_threads_.count(thread_id));
+
         optional<pair<uint64_t, task_t>> res;
         
         while (!res)
@@ -211,12 +215,18 @@ private:
         MY_ASSERT(!tasks_threads_.at(res->first));
         tasks_threads_.at(res->first) = thread_id;
 
+        idle_threads_.erase(thread_id);
+
         return res;
     }
 
     void unassign_task(thread_id_t thread_id, task_id_t task_id)
     {
         mutex_lock_t lock(tasks_mutex_);
+
+        MY_ASSERT(!idle_threads_.count(thread_id));
+        idle_threads_.insert(thread_id);
+
         MY_ASSERT(tasks_threads_.at(task_id) == thread_id);
         tasks_threads_.erase(task_id);
     }
@@ -231,6 +241,8 @@ private:
     unordered_map<task_id_t, optional<thread_id_t>> tasks_threads_;
     queue<pair<uint64_t, task_t>> tasks_queue_;
     unordered_set<task_id_t> tasks_to_cancel_;
+    unordered_set<thread_id_t> idle_threads_;
+
     mutex_t tasks_mutex_;
     boost::condition_variable tasks_cond_;
     
@@ -240,4 +252,5 @@ private:
     thread_id_t next_thread_id_;
 
     boost::atomic_bool time_to_die_;
+    pt::time_duration timeout_;
 };

@@ -4,9 +4,43 @@
 
 boost::mutex cout_mutex;
 
+struct args_t
+{
+    size_t num_hot_threads;
+    pt::time_duration timeout;
+};
+
+optional<args_t> parse_args(int argc, char* argv[])
+{
+    args_t res;
+    bool error = true;
+    
+    if (argc == 3)
+    {
+        try
+        {
+            res.num_hot_threads = boost::lexical_cast<size_t>(argv[1]);
+            res.timeout = pt::seconds(boost::lexical_cast<size_t>(argv[2]));
+            error = false;
+        }
+        catch (boost::bad_lexical_cast &) {}
+    }
+
+    if (error)
+    {
+        cout << "Usage: program num_hot_threads timeout" << endl;
+        return boost::none;
+    }
+    return res;
+}
+
 int main(int argc, char* argv[])
 {
-	threadpool pool(2);
+    auto args = parse_args(argc, argv);
+    if (!args)
+        return 1;
+
+    threadpool pool(args->num_hot_threads, args->timeout);
 
     while (true)
     {
