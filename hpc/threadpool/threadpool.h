@@ -21,6 +21,13 @@ struct threadpool
 {
     typedef boost::function<void()> task_t;
     typedef uint64_t task_id_t;
+    
+    enum cancel_result_t
+    {
+        NOT_FOUND,
+        REMOVED_FROM_QUEUE,
+        TERMINATED
+    };
 
 private:
     typedef boost::thread thread_t;
@@ -93,34 +100,40 @@ public:
         return task_id;
     }
 
-    /*void cancel_task(task_id_t task_id)
+    cancel_result_t cancel_task(task_id_t task_id)
     {
-        mutex_lock_t threads_lock(threads_mutex_);
-        
-        const auto it = boost::find_if(threads_, 
-            [task_id](const threads_t::value_type &r)
-        {
-            return (r.second.task_id && *r.second.task_id == task_id);
-        });
+        mutex_lock_t threads_lock(tasks_mutex_);
+        if (!tasks_threads_.count(task_id) || tasks_to_cancel_.count(task_id))
+            return NOT_FOUND;
 
-        if (it != threads_.end())
+        if (auto thread_id = tasks_threads_.at(task_id))
         {
-            it->second.thread->interrupt();
+            threads_.at(*thread_id)->interrupt();
+            return TERMINATED;
         }
         else
         {
-            threads_lock.unlock();
-
-            mutex_lock_t tasks_lock(tasks_mutex_);
+            MY_ASSERT(!tasks_to_cancel_.count(task_id));
             tasks_to_cancel_.insert(task_id);
+            return REMOVED_FROM_QUEUE;
         }
-    }*/
+    }
 
 private:
     void thread_run(thread_id_t thread_id, bool hot)
     {
         while (!time_to_die_)
         {
+            try
+            {
+                boost::this_thread::interruption_point();
+            }
+            catch (boost::thread_interrupted const&)
+            {
+                mutex_lock_t l(cout_mutex);
+                cout << "Thread " << thread_id << " had a late interruption" << endl;
+            }
+
             const auto task = assign_task(thread_id, boost::none);
             if (!task)
             {
@@ -134,7 +147,7 @@ private:
             }
 
             run_task(thread_id, task->second);
-            
+
             unassign_task(thread_id, task->first);
 
             {
@@ -142,7 +155,7 @@ private:
                 cout << "Task " << task->first << " finished on thread " << thread_id << endl;
             }
         }
-        
+
         {
             mutex_lock_t l(cout_mutex);
             cout << "Thread " << thread_id << " finished" << endl;
