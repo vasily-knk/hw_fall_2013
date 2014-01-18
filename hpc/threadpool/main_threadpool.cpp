@@ -39,6 +39,7 @@ optional<args_t> parse_args(int argc, char* argv[])
 void sig_handler(int /*signum*/)
 {
     pool.reset();
+    exit(0);
 }
 
 int main(int argc, char* argv[])
