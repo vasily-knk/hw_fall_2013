@@ -37,7 +37,7 @@ private:
     typedef boost::mutex mutex_t;
     typedef boost::mutex::scoped_lock mutex_lock_t;
 
-    typedef size_t thread_id_t;
+    typedef uint64_t thread_id_t;
 
 public:
     threadpool(size_t num_threads, pt::time_duration timeout)
@@ -170,18 +170,17 @@ private:
         }
     }
 
-    optional<pair<uint64_t, task_t>> assign_task(thread_id_t thread_id, optional<pt::time_duration> timeout)
+    optional<pair<task_id_t, task_t>> assign_task(thread_id_t thread_id, optional<pt::time_duration> timeout)
     {
         mutex_lock_t lock(tasks_mutex_);
 
         MY_ASSERT(idle_threads_.count(thread_id));
 
-        optional<pair<uint64_t, task_t>> res;
+        optional<pair<task_id_t, task_t>> res;
         
         while (!res)
         {
-            const auto start_time = pt::microsec_clock::local_time();
-            const auto pred = [this, &timeout, &start_time]() -> bool 
+            const auto pred = [this]() -> bool 
             {
                 if (time_to_die_)
                     return true;
@@ -189,13 +188,13 @@ private:
                 if (!tasks_queue_.empty())
                     return true;
 
-                if (timeout)
-                    return (pt::microsec_clock::local_time() - start_time) > *timeout;
-                
                 return false;
             };
             
-            tasks_cond_.wait(lock, pred);
+            if (timeout)
+                tasks_cond_.timed_wait(lock, *timeout, pred);
+            else
+                tasks_cond_.wait(lock, pred);
 
             if (time_to_die_)
                 return boost::none;
@@ -239,7 +238,7 @@ private:
     void clear_queue()
     {
         mutex_lock_t lock(tasks_mutex_);
-        tasks_queue_ = queue<pair<uint64_t, task_t>>();
+        tasks_queue_ = queue<pair<task_id_t, task_t>>();
     }
 
     void cleanup()
@@ -255,7 +254,7 @@ private:
 
 private:
     unordered_map<task_id_t, optional<thread_id_t>> tasks_threads_;
-    queue<pair<uint64_t, task_t>> tasks_queue_;
+    queue<pair<task_id_t, task_t>> tasks_queue_;
     unordered_set<task_id_t> tasks_to_cancel_;
     unordered_set<thread_id_t> idle_threads_;
 

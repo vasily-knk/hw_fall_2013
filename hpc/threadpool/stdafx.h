@@ -51,6 +51,7 @@ using boost::optional;
 #include <boost/lexical_cast.hpp>
 
 
+// VS 2010 doesn't have std::atomic while boost < 1.53 doesn't have boost::atomic
 #if defined(USE_BOOST_ATOMIC)
 #include <boost/atomic.hpp>
 using boost::atomic_bool;
