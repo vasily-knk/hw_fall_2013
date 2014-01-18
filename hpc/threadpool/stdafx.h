@@ -51,10 +51,10 @@ using boost::optional;
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 #include <boost/range/algorithm.hpp>
-#include <boost/range/algorithm_ext/is_sorted.hpp>
+//#include <boost/range/algorithm_ext/is_sorted.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/atomic.hpp>
+//#include <boost/atomic.hpp>
 
 #include <stdexcept>
 
