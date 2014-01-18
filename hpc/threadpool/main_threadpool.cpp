@@ -44,7 +44,6 @@ void sig_handler(int /*signum*/)
 int main(int argc, char* argv[])
 {
     signal(SIGINT, sig_handler);
-    signal(SIGTERM, sig_handler);
 
     auto args = parse_args(argc, argv);
     if (!args)
