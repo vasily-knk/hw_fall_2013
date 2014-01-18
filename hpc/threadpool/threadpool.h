@@ -243,6 +243,11 @@ private:
 
     void cleanup()
     {
+        {
+            mutex_lock_t l(cout_mutex);
+            cout << "Cleanup..." << endl;
+        }
+
         clear_queue();
 
         time_to_die_ = true;
