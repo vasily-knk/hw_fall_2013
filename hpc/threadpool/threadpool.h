@@ -240,7 +240,7 @@ private:
     void clear_queue()
     {
         mutex_lock_t lock(tasks_mutex_);
-        tasks_queue_.swap(queue<pair<uint64_t, task_t>>());
+        tasks_queue_ = queue<pair<uint64_t, task_t>>();
     }
 
     void cleanup()
