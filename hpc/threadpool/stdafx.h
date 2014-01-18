@@ -11,10 +11,6 @@ using std::endl;
 #include <string>
 using std::string;
 
-#include <map>
-using std::map;
-#include <set>
-using std::set;
 #include <vector>
 using std::vector;
 #include <queue>
@@ -30,9 +26,6 @@ using std::make_pair;
 
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/shared_array.hpp>
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/asio.hpp>
 #include <boost/array.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -40,6 +33,8 @@ using std::make_pair;
 using boost::shared_ptr;
 using boost::make_shared;
 
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/time_duration.hpp>
 namespace pt = boost::posix_time;
 
 #include <boost/function.hpp>
@@ -51,10 +46,9 @@ using boost::optional;
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 #include <boost/range/algorithm.hpp>
-//#include <boost/range/algorithm_ext/is_sorted.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-//#include <boost/atomic.hpp>
+#include <boost/atomic.hpp>
 
 #include <stdexcept>
 

@@ -113,14 +113,13 @@ private:
         }
         while (!time_to_die_)
         {
+            // late interruption handling
             try
             {
                 boost::this_thread::interruption_point();
             }
             catch (boost::thread_interrupted const&)
             {
-                mutex_lock_t l(cout_mutex);
-                cout << "Thread " << thread_id << " had a late interruption" << endl;
             }
 
             const auto task = assign_task(thread_id, timeout);
@@ -268,6 +267,6 @@ private:
     task_id_t next_task_id_;
     thread_id_t next_thread_id_;
 
-    bool /*boost::atomic_bool*/ time_to_die_;
+    boost::atomic_bool time_to_die_;
     pt::time_duration timeout_;
 };
