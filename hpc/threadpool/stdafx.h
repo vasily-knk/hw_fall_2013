@@ -2,6 +2,7 @@
 
 #ifdef _MSC_VER
 #include <SDKDDKVer.h>
+#define USE_BOOST_ATOMIC
 #endif
 
 #include <iostream>
@@ -48,7 +49,15 @@ using boost::optional;
 #include <boost/range/algorithm.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+
+
+#if defined(USE_BOOST_ATOMIC)
 #include <boost/atomic.hpp>
+using boost::atomic_bool;
+#else
+#include <atomic>
+using std::atomic_bool;
+#endif
 
 #include <stdexcept>
 

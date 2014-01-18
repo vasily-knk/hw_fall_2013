@@ -267,6 +267,6 @@ private:
     task_id_t next_task_id_;
     thread_id_t next_thread_id_;
 
-    boost::atomic_bool time_to_die_;
+    atomic_bool time_to_die_;
     pt::time_duration timeout_;
 };
