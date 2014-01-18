@@ -171,7 +171,7 @@ private:
         }
     }
 
-    optional<pair<uint64_t, task_t>> assign_task(thread_id_t thread_id, optional<pt::time_duration> time)
+    optional<pair<uint64_t, task_t>> assign_task(thread_id_t thread_id, optional<pt::time_duration> timeout)
     {
         mutex_lock_t lock(tasks_mutex_);
 
@@ -181,17 +181,29 @@ private:
         
         while (!res)
         {
-            if (tasks_queue_.empty())
+            const auto start_time = pt::microsec_clock::local_time();
+            const auto pred = [this, &timeout, &start_time]() -> bool 
             {
-                if (time)
-                    tasks_cond_.timed_wait(lock, *time);
-                else
-                    tasks_cond_.wait(lock);
-            }
+                if (time_to_die_)
+                    return true;
+                
+                if (!tasks_queue_.empty())
+                    return true;
 
+                if (timeout)
+                    return (pt::microsec_clock::local_time() - start_time) > *timeout;
+                
+                return false;
+            };
+            
+            tasks_cond_.wait(lock, pred);
+
+            if (time_to_die_)
+                return boost::none;
+            
             if (tasks_queue_.empty())
             {
-                MY_ASSERT(time || time_to_die_);
+                MY_ASSERT(timeout);
                 return boost::none;
             }
 

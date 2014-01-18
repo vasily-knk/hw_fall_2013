@@ -64,11 +64,11 @@ int main(int argc, char* argv[])
         boost::split(parts, cmd, boost::is_space());
         bool error = true;
         
-        if (parts.size() == 2)
+        if (!parts.empty())
         {
             try
             {
-                if (parts.at(0) == "add")
+                if (parts.at(0) == "add" && parts.size() == 2)
                 {
                     int seconds = boost::lexical_cast<int>(parts.at(1));
                     auto task_id = pool->add_task(sleep_task(seconds));
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
                     cout << "Task id: " << task_id << endl;
                     error = false;
                 }
-                else if (parts.at(0) == "cancel")
+                else if (parts.at(0) == "cancel" && parts.size() == 2)
                 {
                     auto task_id = boost::lexical_cast<threadpool::task_id_t>(parts.at(1));
                     auto res = pool->cancel_task(task_id);
@@ -97,6 +97,11 @@ int main(int argc, char* argv[])
                         break;
                     }
                     cout << endl;
+                    error = false;
+                }
+                else if (parts.at(0) == "quit")
+                {
+                    pool.reset();
                     error = false;
                 }
             } 
