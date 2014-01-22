@@ -14,6 +14,7 @@ inline range_t y_range(const segment_t &segment)
     return range_t(std::min(segment[0].y, segment[1].y), std::max(segment[0].y, segment[1].y));
 }
 
+
 inline coord_t value_for_x(const segment_t &segment, coord_t x)
 {
     const range_t rg = x_range(segment);
@@ -27,6 +28,36 @@ inline coord_t value_for_x(const segment_t &segment, coord_t x)
     const double offset = ratio * double(segment[1].y - segment[0].y);
     return segment[0].y + coord_t(offset);
 }
+
+
+bool point_to_the_left(const segment_t &segment, const point_t &point)
+{
+    const vector_t v1 = segment[1] - segment[0];
+    const vector_t v2 = point - segment[0];
+
+    return (v1 ^ v2) > 0;
+}
+
+bool compare_segments(const segment_t &s1, const segment_t &s2)
+{
+    const segment_t os1(min(s1), max(s1));
+    const segment_t os2(min(s2), max(s2));
+
+    const bool l1 = point_to_the_left(os1, os2[0]);
+    const bool l2 = point_to_the_left(os1, os2[1]);
+
+    if (l1 == l2)
+        return l1;
+    else
+    {
+        const bool r1 = point_to_the_left(os2, os1[0]);
+        const bool r2 = point_to_the_left(os2, os1[1]);
+
+        MY_ASSERT(r1 == r2);
+        return !r1;
+    }
+}
+
 
 struct segment_tree_t
 {
@@ -196,11 +227,7 @@ private:
     {
         auto comp = [this, node](range_it it1, range_it it2) -> bool
         {
-            const coord_t x = node->value().interval.inf;
-            const coord_t y1 = value_for_x(segments_.at(it1), x);
-            const coord_t y2 = value_for_x(segments_.at(it2), x);
-
-            return y1 < y2;
+            return compare_segments(segments_.at(it1), segments_.at(it2));;
         };
 
         // maintaining segments order
@@ -219,9 +246,11 @@ private:
             return;
 
         // extraction
-        auto comp = [this](range_it it, const point_t &point)
+        auto comp = [this](range_it it, const point_t &point) -> bool
         {
-            return value_for_x(segments_.at(it), point.x) < point.y;
+            const segment_t os(geom::structures::min(segments_.at(it)), geom::structures::max(segments_.at(it)));
+            const bool res1 = point_to_the_left(os, point);
+            return res1;
         };
 
         const auto &segments = node->value().segments;
